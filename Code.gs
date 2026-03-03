@@ -172,7 +172,7 @@ function onEditHandler(e) {
 // =================================
 function sortSheetsByDate() {
 
-  const DST_ID = "1oOhR4rDG396X59jNJWqLUHA8L0lXUluVek4YkqhYgMc";  // ＜出荷管理ファイルID＞
+  const DST_ID = "出荷管理ファイルID";  // ＜出荷管理ファイルID＞
   const ss = SpreadsheetApp.openById(DST_ID);
 
   const sheets = ss.getSheets();
