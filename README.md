@@ -96,9 +96,7 @@ protectPastSheets（時間トリガー）
 
 出荷日ごとにシートが自動生成され、データが整理されます。
 
-### システム図
 
-![システム図](docs/system-diagram.png)
 
 ---
 
