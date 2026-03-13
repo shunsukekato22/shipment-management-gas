@@ -8,12 +8,11 @@
 
 
 function onEditHandler(e) {
-  
+
   const SRC_SHEET_NAME = "入力用";
   const FLAG_HEADER = "転記済み";
   const SHIP_DATE_HEADER = "出荷日";
 
-  // ✅ 変更：直書き → PropertiesServiceから取得
   const DST_ID = PropertiesService.getScriptProperties().getProperty("DST_ID");
   if (!DST_ID) {
     console.error("DST_IDが設定されていません。setConfig()を実行してください。");
@@ -21,7 +20,6 @@ function onEditHandler(e) {
   }
 
   const TEMPLATE_SHEET_NAME = "原紙";
-
   const DST_HEADER_ROW = 2;
   const DST_START_ROW = 3;
 
@@ -103,7 +101,6 @@ function onEditHandler(e) {
       const newSheet = template.copyTo(dstSS);
       newSheet.setName(sheetName);
       dstSheet = dstSS.getSheetByName(sheetName);
-
       sheetCreated = true;
     }
 
@@ -130,7 +127,9 @@ function onEditHandler(e) {
     const checkRows = Math.min(50, dataRows);
     const startCheckRow = checkRows > 0 ? lastRow - checkRows + 1 : DST_START_ROW;
 
-    const dstHeadersForExclude = dstSheet.getRange(DST_HEADER_ROW, 1, 1, lastColumn).getValues()[0];
+    const dstHeadersForExclude = dstSheet
+      .getRange(DST_HEADER_ROW, 1, 1, lastColumn)
+      .getValues()[0];
 
     const excludeHeaders = ["別請求", "出荷準備", "在庫管理出庫"];
 
@@ -146,7 +145,6 @@ function onEditHandler(e) {
       : [];
 
     for (let i = dataRange.length - 1; i >= 0; i--) {
-
       const rowHasData = dataRange[i].some((cell, index) => {
         if (index === 0) return false;
         if (excludeIndexes.includes(index)) return false;
@@ -159,23 +157,26 @@ function onEditHandler(e) {
       }
     }
 
+    /* ===============================
+      ✅ 追加：結合セル対応ヘッダーマップ作成
+    =============================== */
+    const headerColMap = buildHeaderColumnMap(dstSheet, DST_HEADER_ROW);
+    const totalCols = dstSheet.getLastColumn();
+    const writeRow = new Array(totalCols).fill("");
 
-    const dstHeaders = dstSheet
-      .getRange(DST_HEADER_ROW, 1, 1, dstSheet.getLastColumn())
-      .getValues()[0];
+    writeRow[0] = row; // A列：元行番号管理
 
-    const writeRow = dstHeaders.map(h => {
-      const index = headers.indexOf(h);
-      return index !== -1 ? rowData[index] : "";
-    });
-
-    writeRow[0] = row;
+    for (const [headerName, dstColIndex] of Object.entries(headerColMap)) {
+      const srcIndex = headers.indexOf(headerName);
+      if (srcIndex !== -1) {
+        writeRow[dstColIndex] = rowData[srcIndex];
+      }
+    }
 
     dstSheet
       .getRange(startRow, 1, 1, writeRow.length)
       .setValues([writeRow]);
 
-    // ✅ 変更：formattedDate変数を削除してインライン化
     const namedRanges = dstSheet.getNamedRanges();
     const shipDateRange = namedRanges.find(nr => nr.getName().endsWith("出荷日セル"));
     if (shipDateRange && !shipDateRange.getRange().getValue()) {
@@ -191,6 +192,38 @@ function onEditHandler(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+/* ===============================
+  ✅ 追加：結合セル対応ヘッダーマップ
+=============================== */
+function buildHeaderColumnMap(dstSheet, headerRow) {
+  const lastCol = dstSheet.getLastColumn();
+  const headers = dstSheet
+    .getRange(headerRow, 1, 1, lastCol)
+    .getValues()[0];
+
+  const map = {}; // { ヘッダー名: 列インデックス(0始まり) }
+
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i];
+
+    // 空白はスキップ（チェックボックス列など）
+    if (header === "" || header === null || header === false) continue;
+
+    // 右隣が空 → 結合セルと判断 → 右隣(i+1)をデータ列とする
+    const nextHeader = headers[i + 1];
+    if (i + 1 < headers.length && (nextHeader === "" || nextHeader === null || nextHeader === false)) {
+      map[header] = i + 1; // データ列は右隣
+      i++;                  // チェックボックス列（i+1）はスキップ
+    } else {
+      // 結合なし → そのままの列
+      map[header] = i;
+    }
+  }
+
+  return map;
 }
 
 
